@@ -1,0 +1,154 @@
+﻿@page "/bloblist"
+@using BlazorBlobApp.Shared;
+@using BlazorInputFile;
+@using System.IO;
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<h3>BlobList</h3>
+
+<a href="api/containers/@downloadFileName">あ.xlsx</a>
+<a href="api/containers/青空文庫テキスト　2017-8-20.zip">青空文庫テキスト　2017-8-20.zip</a>
+
+<p>@status</p>
+
+<InputFile OnChange="HandleFileSelected" />
+<input type="file" />
+
+@if (file != null)
+{
+    <p>@file.Name</p>
+}
+
+<button @onclick="FileUpload">Upload</button>
+
+@if (blobs == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Download</th>
+                <th>Remove</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var blob in blobs)
+            {
+                <tr>
+                    <td>@blob.Name</td>
+                    <td>@blob.Size</td>
+                    <td><button @onclick="() => Download(blob.Name)">Download</button></td>
+                    <td><button @onclick="() => Delete(blob.Name)">Remove</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    private string downloadFileName = "あ.xlsx";
+
+    private BlobObject[] blobs;
+    private IFileListEntry file;
+
+    private string status = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        blobs = await Http.GetFromJsonAsync<BlobObject[]>("api/containers");
+    }
+
+    public async Task Download(string blobName)
+    {
+        //var downloadFile = await Http.GetAsync($"api/containers/{blobName}");
+        //var hoge = downloadFile.Headers;
+        //var content = await downloadFile.Content.ReadAsByteArrayAsync();
+        //var hoge2 = "hoge";
+
+        await JSRuntime.InvokeAsync<object>(
+            "FileSaveAs2",
+            blobName
+            );
+    }
+
+    public void HandleFileSelected(IFileListEntry[] files)
+    {
+        file = files.FirstOrDefault();
+    }
+
+    private async Task FileUpload()
+    {
+        if (file != null)
+        {
+            int bufferSize = 1024 * 1024;
+
+            /*
+            using (var streamContent = new StreamContent(file.Data))
+            {
+                await Http.PostAsync("api/containers", streamContent);
+            }
+            */
+
+
+            using(var ms = new MemoryStream())
+            {
+                await file.Data.CopyToAsync(ms);
+                var content = new MultipartFormDataContent { { new ByteArrayContent(ms.GetBuffer()), "\"upload\"", file.Name } };
+
+                status = $"Finished loading {file.Size} bytes from {file.Name}";
+
+                await Http.PostAsync("api/containers", content);
+
+                blobs = await Http.GetFromJsonAsync<BlobObject[]>("api/containers");
+            }
+
+            /*
+            var ms = new MemoryStream();
+            await file.Data.CopyToAsync(ms);
+
+            var content = new MultipartFormDataContent { { new ByteArrayContent(ms.GetBuffer()), "\"upload\"", file.Name } };
+            await Http.PostAsync("api/containers", content);
+
+
+            using (var streamContent = new StreamContent(file.Data))
+            {
+                var content = new MultipartFormDataContent { { streamContent, "\"upload\"", file.Name } };
+                await Http.PostAsync("api/containers", content);
+                blobs = await Http.GetFromJsonAsync<BlobObject[]>("api/containers");
+            }
+            */
+
+            //using (var reader = new StreamReader(file.Data))
+            //{
+            //var ms = new MemoryStream();
+            //await file.Data.CopyToAsync(ms);
+            //status = $"Finished loading {file.Size} bytes from {file.Name}";
+            //}
+
+
+            /*
+            using (var streamContent = new StreamContent(file.Data, bufferSize))
+            {
+                var content = new MultipartFormDataContent { { streamContent, "\"upload\"", file.Name } };
+                await Http.PostAsync("api/containers", content);
+                blobs = await Http.GetFromJsonAsync<BlobObject[]>("api/containers");
+            }
+            */
+
+
+        }
+    }
+
+    private async Task Delete(string blobName)
+    {
+        await Http.DeleteAsync($"api/containers/{blobName}");
+        blobs = await Http.GetFromJsonAsync<BlobObject[]>("api/containers");
+    }
+}

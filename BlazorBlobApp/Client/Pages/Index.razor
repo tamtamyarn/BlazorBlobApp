@@ -1,0 +1,26 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+<textarea @bind="noteContent" />
+<br />
+<button @onclick="DownloadFile">Download</button>
+
+@code {
+    string noteContent;
+    string fileName = "note.txt";
+
+    public async void DownloadFile()
+    {
+        await JSRuntime.InvokeAsync<object>(
+            "FileSaveAs2"
+            //fileName,
+            //noteContent
+        );
+    }
+}
